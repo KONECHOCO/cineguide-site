@@ -1,0 +1,54 @@
+# Sito pubblico di CineGuide su https://cineguide.ikonetsolutions.com
+# (versione web per i link condivisi + privacy, termini, supporto).
+# Il codice sta in KONECHOCO/programmi-tv: qui lo si compila e pubblica ogni giorno.
+# I dati della guida restano su konechoco.github.io/programmi-tv/epg.
+name: Sito CineGuide
+
+on:
+  schedule:
+    - cron: '40 3 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: KONECHOCO/programmi-tv
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Mantieni attivo l'aggiornamento pianificato
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/site.yml/enable
